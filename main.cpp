@@ -20,7 +20,7 @@ class L293D_STEPPER {
     private: uint coilTwo[2];
     private: float currentAngle = 0.0f;
     private: float stepAngleMultiplier = 1.8;
-           //Nema 17 provides 1.8 degrees per step
+           //Nema 17 provides 1.8 degrees per step so that'll be the standard, this can be set on initialization;
     public: L293D_STEPPER(uint firstCoil[2], uint secondCoil[2], uint gearReduction[2], float motorAnglePerStep = 1.8) {
         for (int i = 0;i < 2;i++) {
             gpio_init(firstCoil[i]);

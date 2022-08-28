@@ -137,7 +137,7 @@ class L293D_STEPPER {
     }
 };
 
-int main() {
+void main() {
 
     stdio_init_all();
 
@@ -154,19 +154,15 @@ int main() {
     L293D_STEPPER stepper_one(stepper_one_coil_one, stepper_one_coil_two, stepper_one_gear_redx);
 
     while (true) {
-        // stepper_one.step('f', 200, 2, false);
-        // sleep_ms(500);
-        stepper_one.moveToNewAngle(0, 2, false);
+        stepper_one.moveToNewAngle(0, 2, true);
         sleep_ms(500);
-        stepper_one.moveToNewAngle(90, 2, false);
+        stepper_one.moveToNewAngle(90, 2, true);
         sleep_ms(500);
-        stepper_one.moveToNewAngle(180, 2, false);
+        stepper_one.moveToNewAngle(180, 2, true);
         sleep_ms(500);
-        stepper_one.moveToNewAngle(270, 2, false);
+        stepper_one.moveToNewAngle(100, 2, true);
         sleep_ms(500);
-        stepper_one.moveToNewAngle(360, 2, false);
-        sleep_ms(500);
+        stepper_one.moveToNewAngle(120, 2, true);
+        sleep_ms(200);
     }
-
-    return 0;
 }

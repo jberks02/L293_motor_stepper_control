@@ -15,126 +15,142 @@ uint stepper_one_coil_two[2] = { 4,5 };
 uint stepper_one_gear_redx[2] = { 1,4 };
 
 class L293D_STEPPER {
-    private: int reductionFactor;
-    private: uint coilOne[2];
-    private: uint coilTwo[2];
-    private: float currentAngle = 0.0f;
-    private: float stepAngleMultiplier = 1.8;
-           //Nema 17 provides 1.8 degrees per step so that'll be the standard, this can be set on initialization;
-    public: L293D_STEPPER(uint firstCoil[2], uint secondCoil[2], uint gearReduction[2], float motorAnglePerStep = 1.8) {
-        for (int i = 0;i < 2;i++) {
-            gpio_init(firstCoil[i]);
-            gpio_set_dir(firstCoil[i], GPIO_OUT);
-            gpio_put(firstCoil[i], 0);
-            coilOne[i] = firstCoil[i];
-        }
-        for (int i = 0;i < 2;i++) {
-            gpio_init(secondCoil[i]);
-            gpio_set_dir(secondCoil[i], GPIO_OUT);
-            gpio_put(secondCoil[i], 0);
-            coilTwo[i] = secondCoil[i];
-        }
-
-        reductionFactor = gearReduction[1] / gearReduction[0];
-
-        stepAngleMultiplier = motorAnglePerStep / (gearReduction[1] / gearReduction[0]);
-
-        releaseMotor();
+private: int reductionFactor;
+private: uint coilOne[2];
+private: uint coilTwo[2];
+private: float currentAngle = 0.0f;
+private: float stepAngleMultiplier = 1.8;
+private: float stepAngle;
+private: uint reduction[2];
+       //Nema 17 provides 1.8 degrees per step so that'll be the standard, this can be set on initialization;
+public: L293D_STEPPER(uint firstCoil[2], uint secondCoil[2], uint gearReduction[2], float motorAnglePerStep = 1.8) {
+    for (int i = 0;i < 2;i++) {
+        gpio_init(firstCoil[i]);
+        gpio_set_dir(firstCoil[i], GPIO_OUT);
+        gpio_put(firstCoil[i], 0);
+        coilOne[i] = firstCoil[i];
     }
-    public: float getCurrentAngle() {
-        return currentAngle;
+    for (int i = 0;i < 2;i++) {
+        gpio_init(secondCoil[i]);
+        gpio_set_dir(secondCoil[i], GPIO_OUT);
+        gpio_put(secondCoil[i], 0);
+        coilTwo[i] = secondCoil[i];
     }
-    public: float setCurrentAngle(float angle) {
-        currentAngle = angle;
-        return currentAngle;
+
+    reduction[0] = gearReduction[0];
+    reduction[1] = gearReduction[1];
+
+    stepAngle = motorAnglePerStep;
+
+    reductionFactor = gearReduction[1] / gearReduction[0];
+
+    stepAngleMultiplier = motorAnglePerStep / (gearReduction[1] / gearReduction[0]);
+
+    releaseMotor();
+}
+public: float getCurrentAngle() {
+    return currentAngle;
+}
+public: float setCurrentAngle(float angle) {
+    currentAngle = angle;
+    return currentAngle;
+}
+public: void setNewGearReduction(uint ngr[2]) {
+
+    reduction[0] = ngr[0];
+    reduction[1] = ngr[1];
+
+    reductionFactor = ngr[1] / ngr[0];
+
+    stepAngleMultiplier = stepAngle / (ngr[1] / ngr[0]);
+}
+public: void moveToNewAngle(float newAngle, int speed = 2, bool hold = true) {
+    float angleDifference;
+    char newDirection;
+    int steps;
+
+    if (newAngle > currentAngle) {
+        newDirection = 'f';
+        angleDifference = newAngle - currentAngle;
     }
-    public: void moveToNewAngle(float newAngle, int speed = 2, bool hold = true) {
-        float angleDifference;
-        char newDirection;
-        int steps;
-
-        if (newAngle > currentAngle) {
-            newDirection = 'f';
-            angleDifference = newAngle - currentAngle;
-        }
-        else {
-            newDirection = 'r';
-            angleDifference = currentAngle - newAngle;
-        }
-
-        steps = angleDifference / stepAngleMultiplier;
-
-        currentAngle = newAngle;
-
-        step(newDirection, steps, speed, hold);
-
+    else {
+        newDirection = 'r';
+        angleDifference = currentAngle - newAngle;
     }
-    private: void setCoilDirection(char direction, uint coil[2]) {
-        // if (direction != 'r' && direction != 'f') return;//invalid direction may throw in future;
-        // if (coil != coilOne && coil != coilTwo) return; // invalid coil set throw event;
 
-        uint coilSequence[2];
+    steps = angleDifference / stepAngleMultiplier;
 
-        if (direction == 'f') {
-            coilSequence[0] = coil[0];
-            coilSequence[1] = coil[1];
-        }
-        if (direction == 'r') {
-            coilSequence[0] = coil[1];
-            coilSequence[1] = coil[0];
-        }
+    currentAngle = newAngle;
 
-        gpio_put(coilSequence[0], 1);
-        gpio_put(coilSequence[1], 0);
+    step(newDirection, steps, speed, hold);
 
+}
+private: void setCoilDirection(char direction, uint coil[2]) {
+    // if (direction != 'r' && direction != 'f') return;//invalid direction may throw in future;
+    // if (coil != coilOne && coil != coilTwo) return; // invalid coil set throw event;
+
+    uint coilSequence[2];
+
+    if (direction == 'f') {
+        coilSequence[0] = coil[0];
+        coilSequence[1] = coil[1];
     }
-    public: void releaseMotor() {
-        for (int i = 0;i < 2;i++) {
-            gpio_put(coilOne[i], 0);
-        }
-        for (int i = 0;i < 2;i++) {
-            gpio_put(coilTwo[i], 0);
-        }
+    if (direction == 'r') {
+        coilSequence[0] = coil[1];
+        coilSequence[1] = coil[0];
     }
-    public: void step(char direction, int steps, int speed = 2, bool hold = true) {
-        if (speed < 2) return; //can't move shaft faster than 60rpm
-        if (direction != 'r' && direction != 'f') return;// direction can only be r or f
-        char polarities[2];
-        uint coils[2][2];
 
-        if (direction == 'f') {
-            polarities[0] = 'f';
-            polarities[1] = 'r';
-            coils[0][0] = coilOne[0];
-            coils[0][1] = coilOne[1];
-            coils[1][0] = coilTwo[0];
-            coils[1][1] = coilTwo[1];
-        }
-        if (direction == 'r') {
-            polarities[0] = 'r';
-            polarities[1] = 'f';
-            coils[0][0] = coilTwo[0];
-            coils[0][1] = coilTwo[1];
-            coils[1][0] = coilOne[0];
-            coils[1][1] = coilOne[1];
-        }
+    gpio_put(coilSequence[0], 1);
+    gpio_put(coilSequence[1], 0);
 
-        while (steps > 0) {
-            for (int d = 0; d < 2;d++) {
-                for (int c = 0; c < 2; c++) {
-                    setCoilDirection(polarities[d], coils[c]);
-                    sleep_ms(speed);
-                    steps--;
-                }
+}
+public: void releaseMotor() {
+    for (int i = 0;i < 2;i++) {
+        gpio_put(coilOne[i], 0);
+    }
+    for (int i = 0;i < 2;i++) {
+        gpio_put(coilTwo[i], 0);
+    }
+}
+public: void step(char direction, int steps, int speed = 2, bool hold = true) {
+    if (speed < 2) return; //can't move shaft faster than 60rpm
+    if (direction != 'r' && direction != 'f') return;// direction can only be r or f
+    char polarities[2];
+    uint coils[2][2];
+
+    if (direction == 'f') {
+        polarities[0] = 'f';
+        polarities[1] = 'r';
+        coils[0][0] = coilOne[0];
+        coils[0][1] = coilOne[1];
+        coils[1][0] = coilTwo[0];
+        coils[1][1] = coilTwo[1];
+    }
+    if (direction == 'r') {
+        polarities[0] = 'r';
+        polarities[1] = 'f';
+        coils[0][0] = coilTwo[0];
+        coils[0][1] = coilTwo[1];
+        coils[1][0] = coilOne[0];
+        coils[1][1] = coilOne[1];
+    }
+
+    while (steps > 0) {
+        for (int d = 0; d < 2;d++) {
+            for (int c = 0; c < 2; c++) {
+                setCoilDirection(polarities[d], coils[c]);
+                sleep_ms(speed);
+                steps--;
             }
         }
-
-
-        if (!hold) {
-            releaseMotor();
-        }
-
     }
+
+
+    if (!hold) {
+        releaseMotor();
+    }
+
+}
 };
 
 void main() {

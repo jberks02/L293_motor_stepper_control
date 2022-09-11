@@ -63,6 +63,7 @@ public: void setNewGearReduction(uint ngr[2]) {
     reductionFactor = ngr[1] / ngr[0];
 
     stepAngleMultiplier = stepAngle / (ngr[1] / ngr[0]);
+
 }
 public: void moveToNewAngle(float newAngle, int speed = 2, bool hold = true) {
     float angleDifference;
